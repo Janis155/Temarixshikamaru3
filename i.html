@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        canvas {
+            border: 1px solid #000;
+            display: block;
+            margin: 20px auto;
+            background-image: url('https://upload.wikimedia.org/wikipedia/commons/7/7a/Pixel_Art_Background.jpg');
+            background-size: cover;
+        }
+
+        #characterSelection {
+            text-align: center;
+            margin: 20px;
+        }
+
+        #characterSelection label {
+            margin-right: 10px;
+        }
+
+        #successScreen {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            color: white;
+            font-size: 24px;
+        }
+    </style>
+    <title>Jump and Run Game</title>
+</head>
+<body>
+    <div id="characterSelection">
+        <label>
+            <input type="radio" name="character" value="preset" checked> Voreingestellter Charakter (Temari)
+        </label>
+        <label>
+            <input type="radio" name="character" value="shikamaru"> Shikamaru
+        </label>
+    </div>
+
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+
+    <div id="successScreen">
+        <img src="https://i.pinimg.com/564x/46/92/39/46923928e1b470c42c956e83c80d64d1.jpg" alt="Success Image" style="max-width: 100%; max-height: 80%;">
+        <p>Wir haben es geschafft! ❤️</p>
+    </div>
+
+    <!-- Füge die Spielergrafiken als Bilder hinzu -->
+    <img id="presetPlayerImage" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQbEW3YBOVK6PICKgdln2VgFCuvMxTXMMsChMYed-DbhFPvWJaKzsqLS7N_v1uKD9OciKk&usqp=CAU" style="display: none;">
+    <img id="shikamaruImage" src="https://i.pinimg.com/474x/23/5f/3b/235f3b3ec42734c42c07986500c26fef.jpg" style="display: none; width: 75px; height: 75px;">
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const canvas = document.getElementById("gameCanvas");
+            const ctx = canvas.getContext("2d");
+
+            const characterSelection = document.getElementById("characterSelection");
+            const presetRadio = document.querySelector('input[value="preset"]');
+            const shikamaruRadio = document.querySelector('input[value="shikamaru"]');
+
+            const presetPlayerImage = document.getElementById("presetPlayerImage");
+            const shikamaruImage = document.getElementById("shikamaruImage");
+
+            const successScreen = document.getElementById("successScreen");
+
+            let selectedPlayerImage = presetPlayerImage;
+
+            const player = {
+                x: 50,
+                y: canvas.height - 150 - 5,
+                size: 75,
+                speed: 5,
+                jumpHeight: 150,
+                fallSpeed: 0.05,
+                isJumping: false,
+                canJump: true,
+                doubleJump: true,
+                jumpCount: 15
+            };
+
+            const obstacles = [];
+            const obstacle_speed = 5;
+            const obstacle_frequency = 40;
+            let timeBetweenSets = 3000;
+            let obstacleGap = 200;
+            let obstacleWaveCount = 0;
+            let startTime;
+
+            // Bild für die Hindernisse
+            const obstacleImage = new Image();
+            obstacleImage.src = "https://ih1.redbubble.net/image.5295314636.5966/bg,f8f8f8-flat,750x,075,f-pad,750x1000,f8f8f8.jpg";
+
+            function drawPlayer() {
+                ctx.drawImage(selectedPlayerImage, player.x, player.y, player.size, player.size);
+            }
+
+            function drawObstacles() {
+                obstacles.forEach(obstacle => {
+                    ctx.drawImage(obstacleImage, obstacle.x, obstacle.y, obstacle.size * 2, obstacle.size * 2);
+                });
+            }
+
+            function gameLoop() {
+                const currentTime = new Date().getTime();
+                const elapsedTime = (currentTime - startTime) / 1000;
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Move player
+                if (player.isJumping) {
+                    if (player.jumpCount >= -7 && player.y > canvas.height - player.size - player.jumpHeight) {
+                        const neg = player.jumpCount < 0 ? -1 : 1;
+                        player.y -= (player.jumpCount ** 2) * 0.5 * neg;
+                        player.jumpCount -= 1;
+                    } else {
+                        player.isJumping = false;
+                        player.jumpCount = 15;
+                    }
+                } else {
+                    player.y += player.speed;
+                    if (player.y > canvas.height - player.size) {
+                        player.y = canvas.height - player.size;
+                        player.canJump = true;
+                        player.doubleJump = true;
+                    }
+                }
+
+                // Generate obstacles
+                if (obstacles.length === 0) {
+                    generateObstacleSet();
+                }
+
+                // Move obstacles
+                obstacles.forEach(obstacle => {
+                    obstacle.x -= obstacle_speed;
+                    if (
+                        player.x < obstacle.x + obstacle.size * 2 &&
+                        player.x + player.size > obstacle.x &&
+                        player.y < obstacle.y + obstacle.size * 2 &&
+                        player.y + player.size > obstacle.y
+                    ) {
+                        alert("Game Over!");
+                        resetGame();
+                    }
+                });
+
+                // Remove off-screen obstacles
+                obstacles.forEach((obstacle, index) => {
+                    if (obstacle.x + obstacle.size * 2 < 0) {
+                        obstacles.splice(index, 1);
+                    }
+                });
+
+                // Simulate falling by gradually increasing the y-coordinate
+                player.y += player.fallSpeed;
+
+                drawPlayer();
+                drawObstacles();
+
+                // Überprüfe, ob 30 Sekunden vergangen sind
+                if (elapsedTime >= 30) {
+                    showSuccessScreen();
+                } else {
+                    requestAnimationFrame(gameLoop);
+                }
+            }
+
+            function generateObstacleSet() {
+                let obstacleSetSize = 3;
+
+                for (let i = 0; i < obstacleSetSize; i++) {
+                    let obstacleSize = player.size / 3;
+                    if (obstacleWaveCount >= 3) {
+                        obstacleSize *= 2;
+                        obstacleWaveCount = 0;
+                    }
+
+                    let obstacleY = canvas.height - (obstacleSize / 3 + Math.random() * 50);
+                    let obstaclePosition = canvas.height / 2 + Math.random() * (canvas.height / 2);
+
+                    obstacles.push({
+                        x: canvas.width + i * (canvas.width / obstacleSetSize) + i * obstacleGap,
+                        y: obstaclePosition,
+                        size: obstacleSize
+                    });
+                }
+
+                obstacleWaveCount++;
+
+                // Verringere den Abstand zwischen Hindernissen
+                obstacleGap -= 5;
+                obstacleGap = Math.max(obstacleGap, 50);
+
+                if (obstacleWaveCount === 3) {
+                    setTimeout(() => {
+                        obstacles.length = 0; // Clear current obstacles
+                        obstacleGap = 200; // Setze den Abstand zurück
+                    }, timeBetweenSets);
+                }
+            }
+
+            function resetGame() {
+                startTime = new Date().getTime();
+                player.x = 50;
+                player.y = canvas.height - 150 - 5;
+                player.isJumping = false;
+                player.canJump = true;
+                player.doubleJump = true;
+                player.jumpCount = 15;
+                obstacles.length = 0;
+                obstacleGap = 200;
+                obstacleWaveCount = 0;
+            }
+
+            function changePlayerImage() {
+                if (shikamaruRadio.checked) {
+                    selectedPlayerImage = shikamaruImage;
+                } else {
+                    selectedPlayerImage = presetPlayerImage;
+                }
+            }
+
+            function showSuccessScreen() {
+                successScreen.style.display = "flex";
+            }
+
+            // Event Listener für die Charakterauswahl
+            characterSelection.addEventListener("change", function () {
+                changePlayerImage();
+            });
+
+            // Event Listener für die Leertaste
+            document.addEventListener("keydown", function (event) {
+                if (event.code === "Space") {
+                    if (player.canJump) {
+                        player.isJumping = true;
+                        player.canJump = false;
+                        player.doubleJump = true;
+                    } else if (player.doubleJump) {
+                        // Erlaube einen Doppelsprung
+                        player.isJumping = true;
+                        player.doubleJump = false;
+                    }
+                }
+            });
+
+            changePlayerImage(); // Setze das initial ausgewählte Bild
+            resetGame(); // Starte das Spiel
+
+            gameLoop();
+        });
+    </script>
+</body>
+</html>
+ 
